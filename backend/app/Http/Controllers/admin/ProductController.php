@@ -54,6 +54,14 @@ return response()->json([
 public function show(){}
 public function update($id , Request $request){
         $product = Product::find($id);
+
+        if ($product==null){
+            return response()->json([
+                'status'=>400,
+                'message'=>'Product not found'
+            ],400);
+        }
+
           $validator = Validator:: make($request->all(), [
 'title' => 'required',
 'price' => 'required|numeric',
@@ -87,6 +95,19 @@ return response()->json([
     'message'=>'Product has been updated successfully'
 ]);
     }
-    public function destroy(){}
+    public function destroy($id){
+        $product=Product::find($id);
+        if ($product==null){
+            return response()->json([
+                'status'=>404,
+                'message'=>'Product not found'
+            ],404);
+        }
+        $product->delete();
+        return response()->json([
+            'status'=>200,
+            'message'=>'Product has been deleted successfully'
+        ],200);
+    }
 
 }
