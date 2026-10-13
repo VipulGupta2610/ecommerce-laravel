@@ -5,112 +5,128 @@ namespace App\Http\Controllers\admin;
 use App\Http\Controllers\Controller;
 use App\Models\Brand;
 use Illuminate\Http\Request;
-use Illuminate\Support\Fascades\Validator;
+use Illuminate\Support\Facades\Validator;
 
 class BrandsController extends Controller
 {
-    // this method will return all brands 
-        public function index()
+    // Return all brands
+    public function index(Request $request)
     {
-        $brands = Brand::orderBy('created_at', 'DESC')->get();
+        $query = Brand::withCount('products')->orderBy('name', 'ASC');
+
+        if ($request->has('status') && $request->status !== null && $request->status !== '') {
+            $query->where('status', $request->status);
+        }
+
+        $brands = $query->get();
 
         return response()->json([
             'status' => 200,
             'data' => $brands,
-        ]);
+        ], 200);
     }
 
-    // this method will store a brand in db
+    // Store a brand
     public function store(Request $request)
     {
-        $validator = Validate::make($request->all(), [
-            'name' => 'required',
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'status' => 'nullable|integer',
         ]);
+
         if ($validator->fails()) {
             return response()->json([
                 'status' => 400,
                 'errors' => $validator->errors(),
             ], 400);
-            $brand = new Brand();
-            $brand->name = $request->name;
-            $brand->status = $request->status;
-            $brand->save();
-
-            return response()->json([
-                'status' => 200,
-                'message' => 'Brand added successfully',
-                'data' => $brand,
-            ], 200);
         }
+
+        $brand = new Brand();
+        $brand->name = $request->name;
+        $brand->status = $request->has('status') ? (int) $request->status : 1;
+        $brand->save();
+
+        return response()->json([
+            'status' => 201,
+            'message' => 'Brand added successfully',
+            'data' => $brand,
+        ], 201);
     }
 
-    // this method will return brand category
+    // Return single brand
     public function show($id)
     {
-        $brand = Brand::find($id);
+        $brand = Brand::withCount('products')->find($id);
 
-        if ($category == null) {
+        if ($brand === null) {
             return response()->json([
                 'status' => 404,
                 'message' => 'Brand not found',
-                'data' => [],
+                'data' => null,
             ], 404);
         }
 
         return response()->json([
             'status' => 200,
             'data' => $brand,
-        ]);
+        ], 200);
     }
 
-    // this method will update single brand
+    // Update single brand
     public function update($id, Request $request)
     {
-
         $brand = Brand::find($id);
 
-        if ($brand == null) {
+        if ($brand === null) {
             return response()->json([
                 'status' => 404,
                 'message' => 'Brand not found',
-                'data' => [],
+                'data' => null,
             ], 404);
         }
 
-        $validator = Validate::make($request->all(), [
-            'name' => 'required',
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'status' => 'nullable|integer',
         ]);
+
         if ($validator->fails()) {
             return response()->json([
                 'status' => 400,
                 'errors' => $validator->errors(),
             ], 400);
-            $brand->name = $request->name;
-            $brand->status = $request->status;
-            $brand->save();
-
-            return response()->json([
-                'status' => 200,
-                'message' => 'Brand added successfully',
-                'data' => $brand,
-            ], 200);
         }
+
+        $brand->name = $request->name;
+        if ($request->has('status')) {
+            $brand->status = (int) $request->status;
+        }
+        $brand->save();
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Brand updated successfully',
+            'data' => $brand,
+        ], 200);
     }
 
-    // this method will destroy single brand
-    public function destroy($id) {
-    $brand = Brand::find($id);
-    if ($category==null){
-        return response()->json([
-            'status'=>404,
-            'message'=>'Brand not found',
-            'data'=>[]
-        ],404);
+    // Destroy single brand
+    public function destroy($id)
+    {
+        $brand = Brand::find($id);
+
+        if ($brand === null) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Brand not found',
+            ], 404);
         }
+
         $brand->delete();
-             return response()->json([
-                'status' => 200,
-                'message' => 'Brand deleted successfully'
-            ], 200);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Brand deleted successfully',
+        ], 200);
     }
 }

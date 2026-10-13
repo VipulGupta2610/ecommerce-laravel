@@ -3,45 +3,60 @@
 namespace App\Http\Controllers\admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\TempImage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
-
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class TempImageController extends Controller
 {
-    //
-
-    public function store(Request $request){
-        $validator = Validator::make($request->all(),[
-            'image'=> 'rqeuired|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ]);
-        if ($validator->fails()){
+
+        if ($validator->fails()) {
             return response()->json([
-                'status'=>400,
-                'errors'=>$validator->errors()
-            ],400);
+                'status' => 400,
+                'errors' => $validator->errors(),
+            ], 400);
         }
-        $tempImage = new TempImage();
-        $tempImage->name='Dummy name';
-        $tempImage->save();
 
         $image = $request->file('image');
-        $imageName = time().'.'.$image->extension();
-        $image->move(public_path('uploads/temp').$imageName);
+        $ext = $image->getClientOriginalExtension() ?: $image->extension();
+        $imageName = time() . '-' . uniqid() . '.' . $ext;
 
-        $tempImage->name=$imageName;
-        $tempImage->save();       
-        
-        $manager = new ImageManager(Driver::class);
-        $img = $manager->read(public_path('uploads/temp/'.$imageName));
+        $tempPath = public_path('uploads/temp');
+        $thumbPath = public_path('uploads/temp/thumb');
 
-        $img->coverDown(400,450);
-        $img->save(public_path('uploads/temp/thumb'.$imageName));
+        File::ensureDirectoryExists($tempPath);
+        File::ensureDirectoryExists($thumbPath);
+
+        // Move original image to temp directory
+        $image->move($tempPath, $imageName);
+
+        $tempImage = new TempImage();
+        $tempImage->name = $imageName;
+        $tempImage->save();
+
+        // Generate thumbnail
+        try {
+            $manager = new ImageManager(new Driver());
+            $img = $manager->decodePath($tempPath . '/' . $imageName);
+            $img->coverDown(400, 450);
+            $img->save($thumbPath . '/' . $imageName);
+        } catch (\Throwable $e) {
+            // Fallback: copy file to thumb if intervention has issues with certain driver
+            File::copy($tempPath . '/' . $imageName, $thumbPath . '/' . $imageName);
+        }
 
         return response()->json([
-            'status'=>200,
-            'message'=>'Image has been updated successfully',
-            'data'=>$tempImage
-        ],200);
+            'status' => 200,
+            'message' => 'Image uploaded successfully',
+            'data' => $tempImage,
+        ], 200);
     }
 }
