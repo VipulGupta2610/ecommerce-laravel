@@ -6,11 +6,12 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
+
 class TempImageController extends Controller
 {
     //
 
-    public function index(Request $request){
+    public function store(Request $request){
         $validator = Validator::make($request->all(),[
             'image'=> 'rqeuired|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
         ]);
@@ -29,10 +30,17 @@ class TempImageController extends Controller
         $image->move(public_path('uploads/temp').$imageName);
 
         $tempImage->name=$imageName;
-        $tempImage->save();        
+        $tempImage->save();       
+        
+        $manager = new ImageManager(Driver::class);
+        $img = $manager->read(public_path('uploads/temp/'.$imageName));
+
+        $img->coverDown(400,450);
+        $img->save(public_path('uploads/temp/thumb'.$imageName));
 
         return response()->json([
             'status'=>200,
+            'message'=>'Image has been updated successfully',
             'data'=>$tempImage
         ],200);
     }
