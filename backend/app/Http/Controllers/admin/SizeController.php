@@ -5,14 +5,15 @@ namespace App\Http\Controllers\admin;
 use App\Http\Controllers\Controller;
 use App\Models\Size;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class SizeController extends Controller
 {
-    public function index (){
-        $sizes=Size::orderBy('name','ASC')->get();
-        return response()->json([
-            'status'=>200,
-            'data'=>$sizes;
-        ],200);
-    }
+    // public function index (){
+    //     $sizes=Size::orderBy('name','ASC')->get();
+    //     return response()->json([
+    //         'status'=>200,
+    //         'data'=>$sizes;
+    //     ],200);
+    // }
 }
