@@ -46,6 +46,30 @@ $product->status = $request->status;
 $product->is_featured = $request->is_featured;
 $product->save();
 
+        if (!empty($request->gallery)){
+            foreach ($request->galler as $tempImageid){
+                $tempImage = TempImage::find($tempImageid);
+                $extArray = explode('.',$tempImage->name);
+                $ext = end($extArray);
+
+                $imageName = $product->id.'-'.time().'.'.$ext;
+
+        $manager = new ImageManager(Driver::class);
+        $img = $manager->read(public_path('uploads/temp/'.$imageName->name));
+
+        $img->scaleDown(1200);
+        $img->save(public_path('uploads/products/large'.$imageName));
+
+
+        // small
+        $manager = new ImageManager(Driver::class);
+        $img = $manager->read(public_path('uploads/temp/'.$imageName->name));
+
+        $img->coverDown(1200);
+        $img->save(public_path('uploads/products/large'.$imageName));
+            }
+        }
+
 return response()->json([
     'status'=>200,
     'message'=>'Product has been created successfully'
