@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Trash2, ShoppingBag, ArrowRight, Plus, Minus, CheckCircle } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { formatImageUrl } from '../../services/api';
 
 export default function CartDrawer() {
   const {
@@ -110,7 +111,7 @@ export default function CartDrawer() {
                   className="flex gap-4 p-3 rounded-2xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 transition-colors"
                 >
                   <img
-                    src={item.image}
+                    src={formatImageUrl(item.image)}
                     alt={item.title}
                     className="w-20 h-20 rounded-xl object-cover bg-white shrink-0"
                     onError={(e) => {

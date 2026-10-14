@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Edit2, Trash2, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
-import { productService, categoryService } from '../../services/api';
+import { productService, categoryService, formatImageUrl } from '../../services/api';
 
 export default function ProductsList() {
   const [products, setProducts] = useState([]);
@@ -18,13 +18,17 @@ export default function ProductsList() {
       if (searchTerm) params.search = searchTerm;
       if (selectedCategory) params.category_id = selectedCategory;
 
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, catRes] = await Promise.allSettled([
         productService.getProducts(params),
         categoryService.getCategories(),
       ]);
 
-      setProducts(prodRes.data.products || prodRes.data.data || []);
-      setCategories(catRes.data.data || []);
+      if (prodRes.status === 'fulfilled') {
+        setProducts(prodRes.value.data.products || prodRes.value.data.data || []);
+      }
+      if (catRes.status === 'fulfilled') {
+        setCategories(catRes.value.data.data || []);
+      }
     } catch (err) {
       console.error('Error fetching products list:', err);
     } finally {
@@ -140,7 +144,7 @@ export default function ProductsList() {
                 </tr>
               ) : (
                 products.map((p) => {
-                  const img = p.image_url || (p.image ? `http://localhost:8000/uploads/products/small/${p.image}` : null);
+                  const img = formatImageUrl(p.image_url || p.image, p.category?.name);
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3.5 px-6">

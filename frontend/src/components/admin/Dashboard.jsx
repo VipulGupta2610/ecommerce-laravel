@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, Layers, Tag, Ruler, Plus, ArrowRight, ExternalLink } from 'lucide-react';
-import { productService, categoryService, brandService, sizeService } from '../../services/api';
+import { productService, categoryService, brandService, sizeService, formatImageUrl } from '../../services/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -17,17 +17,17 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const [prodRes, catRes, brandRes, sizeRes] = await Promise.all([
+        const [prodRes, catRes, brandRes, sizeRes] = await Promise.allSettled([
           productService.getProducts(),
           categoryService.getCategories(),
           brandService.getBrands(),
           sizeService.getSizes(),
         ]);
 
-        const prods = prodRes.data.products || prodRes.data.data || [];
-        const cats = catRes.data.data || [];
-        const brs = brandRes.data.data || [];
-        const szs = sizeRes.data.data || [];
+        const prods = prodRes.status === 'fulfilled' ? (prodRes.value.data.products || prodRes.value.data.data || []) : [];
+        const cats = catRes.status === 'fulfilled' ? (catRes.value.data.data || []) : [];
+        const brs = brandRes.status === 'fulfilled' ? (brandRes.value.data.data || []) : [];
+        const szs = sizeRes.status === 'fulfilled' ? (sizeRes.value.data.data || []) : [];
 
         setStats({
           products: prods.length,
@@ -143,7 +143,7 @@ export default function Dashboard() {
                 </tr>
               ) : (
                 recentProducts.map((p) => {
-                  const img = p.image_url || (p.image ? `http://localhost:8000/uploads/products/small/${p.image}` : null);
+                  const img = formatImageUrl(p.image_url || p.image, p.category?.name);
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 px-6">

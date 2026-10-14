@@ -123,7 +123,7 @@ export default function ProductDetail() {
                 className="w-full h-full object-cover object-center"
                 onError={(e) => {
                   e.target.onerror = null;
-                  e.target.src = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80';
+                  e.target.src = getCategoryFallbackImage(product.category?.name);
                 }}
               />
             ) : (
@@ -151,7 +151,7 @@ export default function ProductDetail() {
           {product.product_images && product.product_images.length > 0 && (
             <div className="flex gap-3 overflow-x-auto pb-2">
               {product.product_images.map((imgObj) => {
-                const thumbUrl = imgObj.image_url || `http://localhost:8000/uploads/products/small/${imgObj.image}`;
+                const thumbUrl = formatImageUrl(imgObj.image_url || imgObj.image, product.category?.name);
                 return (
                   <button
                     key={imgObj.id}
@@ -162,7 +162,15 @@ export default function ProductDetail() {
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <img src={thumbUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <img
+                      src={thumbUrl}
+                      alt="Thumbnail"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = getCategoryFallbackImage(product.category?.name);
+                      }}
+                    />
                   </button>
                 );
               })}
@@ -284,7 +292,9 @@ export default function ProductDetail() {
             <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
               <span className="flex items-center gap-1.5 text-emerald-600 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                In Stock ({product.qty || 25} available)
+                {product.qty !== null && product.qty !== undefined && product.qty > 0
+                  ? `In Stock (${product.qty} available)`
+                  : 'In Stock (Ready to dispatch)'}
               </span>
               <span>Ships in 24 hours</span>
             </div>

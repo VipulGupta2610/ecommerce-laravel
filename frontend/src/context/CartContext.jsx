@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { formatImageUrl } from '../services/api';
 
 const CartContext = createContext();
 
@@ -20,12 +21,13 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (product, quantity = 1, size = null) => {
     const itemKey = `${product.id}-${size || 'standard'}`;
+    const formattedImg = formatImageUrl(product.image_url || product.image, product.category?.name);
     setCartItems((prevItems) => {
       const existing = prevItems.find((item) => item.cartKey === itemKey);
       if (existing) {
         return prevItems.map((item) =>
           item.cartKey === itemKey
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: item.quantity + quantity, image: formattedImg || item.image }
             : item
         );
       } else {
@@ -35,9 +37,9 @@ export const CartProvider = ({ children }) => {
             cartKey: itemKey,
             id: product.id,
             title: product.title,
-            price: Number(product.price),
+            price: Number(product.price || 0),
             compare_price: product.compare_price ? Number(product.compare_price) : null,
-            image: product.image_url || product.image,
+            image: formattedImg,
             sku: product.sku,
             size: size,
             quantity: quantity,

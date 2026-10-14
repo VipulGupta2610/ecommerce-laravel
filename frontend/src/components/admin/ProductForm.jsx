@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, UploadCloud, X, Check, Trash2, AlertCircle } from 'lucide-react';
-import { productService, categoryService, brandService, sizeService, imageService } from '../../services/api';
+import { productService, categoryService, brandService, sizeService, imageService, formatImageUrl } from '../../services/api';
 
 export default function ProductForm() {
   const { id } = useParams();
@@ -38,14 +38,14 @@ export default function ProductForm() {
   useEffect(() => {
     const loadDropdownData = async () => {
       try {
-        const [catRes, brandRes, sizeRes] = await Promise.all([
+        const [catRes, brandRes, sizeRes] = await Promise.allSettled([
           categoryService.getCategories(),
           brandService.getBrands(),
           sizeService.getSizes(),
         ]);
-        setCategories(catRes.data.data || []);
-        setBrands(brandRes.data.data || []);
-        setAvailableSizes(sizeRes.data.data || []);
+        if (catRes.status === 'fulfilled') setCategories(catRes.value.data.data || []);
+        if (brandRes.status === 'fulfilled') setBrands(brandRes.value.data.data || []);
+        if (sizeRes.status === 'fulfilled') setAvailableSizes(sizeRes.value.data.data || []);
 
         if (isEdit) {
           const prodRes = await productService.getProduct(id);
@@ -109,7 +109,7 @@ export default function ProductForm() {
           {
             id: temp.id,
             name: temp.name,
-            url: temp.image_url || `http://localhost:8000/uploads/temp/thumb/${temp.name}`,
+            url: formatImageUrl(temp.image_url || `/uploads/temp/thumb/${temp.name}`),
           },
         ]);
       } catch (err) {
@@ -136,6 +136,12 @@ export default function ProductForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
+
+    if (!formData.category_id || Number(formData.category_id) === 0) {
+      setErrors({ category_id: ['Please select a valid category for the product.'] });
+      return;
+    }
+
     setLoading(true);
 
     const payload = {
@@ -145,7 +151,7 @@ export default function ProductForm() {
       compare_price: formData.compare_price ? Number(formData.compare_price) : null,
       category_id: Number(formData.category_id),
       brand_id: formData.brand_id ? Number(formData.brand_id) : null,
-      qty: Number(formData.qty),
+      qty: Number(formData.qty || 0),
       sizes: selectedSizes,
       gallery: uploadedGallery.map((item) => item.id),
     };
@@ -429,7 +435,7 @@ export default function ProductForm() {
                   {existingImages.map((img) => (
                     <div key={img.id} className="relative w-24 h-24 rounded-xl overflow-hidden border border-slate-200 group">
                       <img
-                        src={img.image_url || `http://localhost:8000/uploads/products/small/${img.image}`}
+                        src={formatImageUrl(img.image_url || img.image)}
                         alt=""
                         className="w-full h-full object-cover"
                       />
