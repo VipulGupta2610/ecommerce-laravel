@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ShoppingBag, Star, ShieldCheck, Truck, ArrowLeft, Check, Plus, Minus } from 'lucide-react';
-import { productService } from '../services/api';
+import { productService, formatImageUrl, getCategoryFallbackImage } from '../services/api';
 import { useCart } from '../context/CartContext';
 import ProductCard from '../components/common/ProductCard';
 
@@ -23,27 +23,32 @@ export default function ProductDetail() {
         setLoading(true);
         const res = await productService.getProduct(id);
         const prod = res.data.product || res.data.data;
+        if (!prod) {
+          setProduct(null);
+          return;
+        }
+
         setProduct(prod);
 
-        // Initial image
-        if (prod.image_url) {
-          setSelectedImage(prod.image_url);
-        } else if (prod.product_images && prod.product_images.length > 0) {
-          setSelectedImage(prod.product_images[0].image_url || `http://localhost:8000/uploads/products/small/${prod.product_images[0].image}`);
-        } else if (prod.image) {
-          setSelectedImage(`http://localhost:8000/uploads/products/small/${prod.image}`);
-        }
+        // Initial image with fallback normalization
+        const catName = prod.category?.name || '';
+        const primaryImg = prod.image_url || prod.image || (prod.product_images?.[0]?.image_url || prod.product_images?.[0]?.image);
+        setSelectedImage(formatImageUrl(primaryImg, catName));
 
         // Initial size
         if (prod.sizes && prod.sizes.length > 0) {
           setSelectedSize(prod.sizes[0].name);
         }
 
-        // Fetch related products in same category
+        // Fetch related products in same category safely
         if (prod.category_id) {
-          const relRes = await productService.getProducts({ category_id: prod.category_id });
-          const relList = (relRes.data.products || relRes.data.data || []).filter((p) => p.id !== prod.id);
-          setRelatedProducts(relList.slice(0, 3));
+          try {
+            const relRes = await productService.getProducts({ category_id: prod.category_id, status: 1 });
+            const relList = (relRes.data.products || relRes.data.data || []).filter((p) => p.id !== prod.id);
+            setRelatedProducts(relList.slice(0, 3));
+          } catch (relErr) {
+            console.warn('Could not load related products:', relErr);
+          }
         }
       } catch (err) {
         console.error('Error fetching product details:', err);
