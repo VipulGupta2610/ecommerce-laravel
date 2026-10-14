@@ -11,26 +11,42 @@ export default function Shop() {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   // Filters state from URL
-  const selectedCategory = searchParams.get('category_id') || '';
+  const rawCategoryParam = searchParams.get('category_id') || searchParams.get('category') || '';
   const selectedBrand = searchParams.get('brand_id') || '';
   const selectedSort = searchParams.get('sort') || 'latest';
   const searchQuery = searchParams.get('search') || '';
   const featuredOnly = searchParams.get('is_featured') || '';
 
+  // Match category by ID or name
+  const matchedCategory = categories.find(
+    (c) => String(c.id) === rawCategoryParam || c.name.toLowerCase() === rawCategoryParam.toLowerCase()
+  );
+  const selectedCategory = matchedCategory ? String(matchedCategory.id) : (Number(rawCategoryParam) ? rawCategoryParam : '');
+
   const [searchInput, setSearchInput] = useState(searchQuery);
+
+  // Keep search input synced when URL query changes
+  useEffect(() => {
+    setSearchInput(searchQuery);
+  }, [searchQuery]);
 
   // Load filter options (categories and brands) once
   useEffect(() => {
     const loadFilters = async () => {
       try {
-        const [catRes, brandRes] = await Promise.all([
+        const [catRes, brandRes] = await Promise.allSettled([
           categoryService.getCategories({ status: 1 }),
           brandService.getBrands({ status: 1 }),
         ]);
-        setCategories(catRes.data.data || []);
-        setBrands(brandRes.data.data || []);
+        if (catRes.status === 'fulfilled') {
+          setCategories(catRes.value.data.data || []);
+        }
+        if (brandRes.status === 'fulfilled') {
+          setBrands(brandRes.value.data.data || []);
+        }
       } catch (err) {
         console.error('Error loading filter lists:', err);
       }
@@ -38,39 +54,48 @@ export default function Shop() {
     loadFilters();
   }, []);
 
-  // Fetch products whenever searchParams change
+  // Fetch products whenever searchParams or resolved category changes
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setFetchError(false);
+      const params = {
+        status: 1,
+      };
+      if (selectedCategory) params.category_id = selectedCategory;
+      if (selectedBrand) params.brand_id = selectedBrand;
+      if (selectedSort) params.sort = selectedSort;
+      if (searchQuery) params.search = searchQuery;
+      if (featuredOnly) params.is_featured = featuredOnly;
+
+      const res = await productService.getProducts(params);
+      const list = res.data.products || res.data.data || [];
+      setProducts(list);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const params = {
-          status: 1,
-        };
-        if (selectedCategory) params.category_id = selectedCategory;
-        if (selectedBrand) params.brand_id = selectedBrand;
-        if (selectedSort) params.sort = selectedSort;
-        if (searchQuery) params.search = searchQuery;
-        if (featuredOnly) params.is_featured = featuredOnly;
-
-        const res = await productService.getProducts(params);
-        const list = res.data.products || res.data.data || [];
-        setProducts(list);
-      } catch (err) {
-        console.error('Error fetching products:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchProducts();
-  }, [searchParams]);
+  }, [searchParams, selectedCategory]);
 
   const updateParam = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
-    if (value) {
-      newParams.set(key, value);
+    // If setting category, clean both category and category_id params
+    if (key === 'category_id' || key === 'category') {
+      newParams.delete('category');
+      newParams.delete('category_id');
+      if (value) newParams.set('category_id', value);
     } else {
-      newParams.delete(key);
+      if (value) {
+        newParams.set(key, value);
+      } else {
+        newParams.delete(key);
+      }
     }
     setSearchParams(newParams);
   };
@@ -253,6 +278,22 @@ export default function Shop() {
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="h-80 rounded-2xl bg-slate-200/80 animate-pulse" />
               ))}
+            </div>
+          ) : fetchError ? (
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
+                <RefreshCw className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-black text-slate-900">Failed to load catalog products</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                There was a problem communicating with the backend server. Please verify the connection and retry.
+              </p>
+              <button
+                onClick={fetchProducts}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Retry Now
+              </button>
             </div>
           ) : products.length === 0 ? (
             <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center space-y-4">

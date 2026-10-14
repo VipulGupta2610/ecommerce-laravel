@@ -1,37 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, Flame, ShieldCheck, Zap, Star } from 'lucide-react';
-import { productService, categoryService } from '../services/api';
+import { ArrowRight, Sparkles, Flame, ShieldCheck, Zap, Star, RefreshCw } from 'lucide-react';
+import { productService, categoryService, formatImageUrl } from '../services/api';
 import ProductCard from '../components/common/ProductCard';
 
 export default function Home() {
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [recentProducts, setRecentProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  const loadHomeData = async () => {
+    try {
+      setLoading(true);
+      setHasError(false);
+
+      // Fetch featured, all products and categories independently using allSettled
+      const [featResult, allResult, catResult] = await Promise.allSettled([
+        productService.getProducts({ is_featured: 'yes', status: 1 }),
+        productService.getProducts({ status: 1 }),
+        categoryService.getCategories({ status: 1 }),
+      ]);
+
+      let featured = [];
+      if (featResult.status === 'fulfilled') {
+        featured = featResult.value.data.products || featResult.value.data.data || [];
+      }
+
+      let all = [];
+      if (allResult.status === 'fulfilled') {
+        all = allResult.value.data.products || allResult.value.data.data || [];
+      }
+
+      // If no products were marked as featured, use the top products as featured
+      if (featured.length === 0 && all.length > 0) {
+        featured = all.slice(0, 6);
+      }
+
+      setFeaturedProducts(featured);
+      setRecentProducts(all);
+
+      if (catResult.status === 'fulfilled') {
+        const cats = catResult.value.data.data || [];
+        setCategories(cats);
+      }
+    } catch (err) {
+      console.error('Error loading home data:', err);
+      setHasError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadHomeData = async () => {
-      try {
-        setLoading(true);
-        const [prodRes, catRes] = await Promise.all([
-          productService.getProducts({ is_featured: 'yes' }),
-          categoryService.getCategories({ status: 1 }),
-        ]);
-
-        const products = prodRes.data.products || prodRes.data.data || [];
-        setFeaturedProducts(products);
-
-        const cats = catRes.data.data || [];
-        setCategories(cats);
-      } catch (err) {
-        console.error('Error loading home data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadHomeData();
   }, []);
+
+  const heroProduct = featuredProducts[0] || recentProducts[0] || null;
 
   return (
     <div className="space-y-20 pb-16">
@@ -95,77 +121,93 @@ export default function Home() {
 
           {/* Hero Visual Card Showcase */}
           <div className="lg:col-span-5 relative flex justify-center">
-            <div className="w-full max-w-md aspect-[4/5] rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 flex flex-col justify-between shadow-2xl relative group">
-              <div className="flex items-center justify-between">
-                <span className="px-3 py-1 rounded-full bg-blue-600/30 text-blue-300 text-xs font-bold border border-blue-500/30">
-                  New Arrival
-                </span>
-                <div className="flex items-center gap-1 text-amber-400">
-                  <Star className="w-4 h-4 fill-amber-400" />
-                  <span className="text-xs font-bold text-white">Top Rated</span>
+            {heroProduct ? (
+              <div className="w-full max-w-md aspect-[4/5] rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 flex flex-col justify-between shadow-2xl relative group">
+                <div className="flex items-center justify-between">
+                  <span className="px-3 py-1 rounded-full bg-blue-600/30 text-blue-300 text-xs font-bold border border-blue-500/30">
+                    Staff Selection
+                  </span>
+                  <div className="flex items-center gap-1 text-amber-400">
+                    <Star className="w-4 h-4 fill-amber-400" />
+                    <span className="text-xs font-bold text-white">4.9 / 5.0</span>
+                  </div>
+                </div>
+
+                <div className="my-auto py-6 text-center space-y-3">
+                  <div className="w-44 h-44 rounded-2xl overflow-hidden mx-auto bg-slate-900 border border-slate-800 shadow-xl group-hover:scale-105 transition-transform duration-300">
+                    <img
+                      src={formatImageUrl(heroProduct.image_url || heroProduct.image, heroProduct.category?.name)}
+                      alt={heroProduct.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <h3 className="text-xl font-black text-white line-clamp-1">{heroProduct.title}</h3>
+                  <p className="text-xs text-slate-400 max-w-xs mx-auto line-clamp-2">
+                    {heroProduct.short_description || 'High-performance luxury craftsmanship.'}
+                  </p>
+                  <div className="text-xl font-black text-blue-400">${Number(heroProduct.price).toFixed(2)}</div>
+                </div>
+
+                <Link
+                  to={`/product/${heroProduct.id}`}
+                  className="w-full py-3 bg-white text-slate-950 font-bold text-xs rounded-xl text-center hover:bg-slate-100 transition-colors"
+                >
+                  View Selected Piece
+                </Link>
+              </div>
+            ) : (
+              <div className="w-full max-w-md aspect-[4/5] rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 flex flex-col justify-between shadow-2xl">
+                <div className="text-center my-auto space-y-3">
+                  <Zap className="w-12 h-12 text-blue-400 mx-auto" />
+                  <h3 className="text-lg font-bold text-white">Curated Releases</h3>
+                  <p className="text-xs text-slate-400">Loading catalog items...</p>
                 </div>
               </div>
-
-              <div className="my-auto py-8 text-center space-y-3">
-                <div className="w-36 h-36 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto text-blue-400 shadow-inner">
-                  <Zap className="w-16 h-16 animate-pulse" />
-                </div>
-                <h3 className="text-2xl font-black text-white">Nike Air Max Pulse</h3>
-                <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                  Engineered with point-loaded cushioning and iconic London-inspired aesthetic.
-                </p>
-                <div className="text-xl font-black text-blue-400">$149.99</div>
-              </div>
-
-              <Link
-                to="/shop"
-                className="w-full py-3 bg-white text-slate-950 font-bold text-xs rounded-xl text-center hover:bg-slate-100 transition-colors"
-              >
-                View Selected Piece
-              </Link>
-            </div>
+            )}
           </div>
         </div>
       </section>
 
       {/* Category Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
-          <div>
-            <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600">Explore by Category</span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">Curated Collections</h2>
-          </div>
-          <Link
-            to="/shop"
-            className="text-sm font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1 group"
-          >
-            <span>View All Collections</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {categories.map((cat, i) => (
+      {categories.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
+            <div>
+              <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600">Explore by Category</span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">Curated Collections</h2>
+            </div>
             <Link
-              key={cat.id}
-              to={`/shop?category_id=${cat.id}`}
-              className="group p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-500/50 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+              to="/shop"
+              className="text-sm font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1 group"
             >
-              <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-colors flex items-center justify-center text-slate-700 font-black text-sm mb-4">
-                0{i + 1}
-              </div>
-              <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                  {cat.name}
-                </h3>
-                <span className="text-xs text-slate-400 font-medium">
-                  {cat.products_count ? `${cat.products_count} Items` : 'Available'}
-                </span>
-              </div>
+              <span>View All Collections</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
-          ))}
-        </div>
-      </section>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {categories.map((cat, i) => (
+              <Link
+                key={cat.id}
+                to={`/shop?category_id=${cat.id}`}
+                className="group p-5 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-500/50 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-colors flex items-center justify-center text-slate-700 font-black text-sm mb-4">
+                  0{i + 1}
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    {cat.name}
+                  </h3>
+                  <span className="text-xs text-slate-400 font-medium">
+                    {cat.products_count !== undefined ? `${cat.products_count} Items` : 'Browse'}
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Featured Products Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -175,7 +217,9 @@ export default function Home() {
               <Flame className="w-3.5 h-3.5 text-amber-500" />
               <span>Trending Spotlight</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">Featured Releases</h2>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+              Featured Releases
+            </h2>
           </div>
           <Link
             to="/shop"
@@ -192,9 +236,19 @@ export default function Home() {
               <div key={n} className="h-96 rounded-2xl bg-slate-200 animate-pulse" />
             ))}
           </div>
+        ) : hasError ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 space-y-3">
+            <p className="text-slate-600 font-bold">Unable to connect to the product catalog</p>
+            <button
+              onClick={loadHomeData}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Retry Connection
+            </button>
+          </div>
         ) : featuredProducts.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
-            <p className="text-slate-500">No featured products found.</p>
+            <p className="text-slate-500">No products available at the moment.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -204,6 +258,31 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* Additional All Catalog Highlights if there are more products */}
+      {recentProducts.length > featuredProducts.length && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
+            <div>
+              <span className="text-xs font-extrabold uppercase tracking-widest text-blue-600">Explore Catalog</span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">Latest Additions</h2>
+            </div>
+            <Link
+              to="/shop"
+              className="text-sm font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1 group"
+            >
+              <span>Explore All Products</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recentProducts.slice(0, 6).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
